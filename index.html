@@ -1,0 +1,409 @@
+<!doctype html>
+<html>
+<head>
+  <title>My Todo MVC</title>
+
+  <link rel="stylesheet" href="vendor/base.css">
+  <link rel="stylesheet" href="vendor/index.css">
+</head>
+<body>
+  <section id="todoapp">
+		<header id="header">
+			<h1>todos</h1>
+			<input id="new-todo" placeholder="What needs to be done?"
+        autofocus="" onchange="addTodo(this.value);this.value='';">
+		</header>
+		<section id="main" style="display: block;">
+			<input id="toggle-all" type="checkbox">
+			<label for="toggle-all">Mark all as complete</label>
+			<ul id="todo-list">
+    		<li class="completed" data-id="9df9b03c-5af5-4712-8365-9bf28d85f7b7">
+    			<div class="view">
+    				<input class="toggle" type="checkbox" checked="">
+    				<label>belajar HTML5</label>
+    				<button class="destroy"></button>
+    			</div>
+    			<input class="edit" value="belajar HTML5">
+    		</li>
+    		<li data-id="84c870fb-ee81-4e0a-8353-23e6c7bd8d7c">
+    			<div class="view">
+    				<input class="toggle" type="checkbox">
+    				<label>belajar jQuery</label>
+    				<button class="destroy"></button>
+    			</div>
+    			<input class="edit" value="belajar jQuery">
+    		</li>
+    		<li data-id="c936dc19-66c4-4e46-a69e-9cbc99b42fa0">
+    			<div class="view">
+    				<input class="toggle" type="checkbox">
+    				<label>belajar Chartist</label>
+    				<button class="destroy"></button>
+    			</div>
+    			<input class="edit" value="belajar Chartist">
+    		</li>
+    	</ul>
+		</section>
+		<footer id="footer" style="display: block;">
+  		<span id="todo-count"><strong>2</strong> items left</span>
+  		<ul id="filters">
+  			<li>
+  				<a class="selected" href="#/all">All</a>
+  			</li>
+  			<li>
+  				<a href="#/active">Active</a>
+  			</li>
+  			<li>
+  				<a href="#/completed">Completed</a>
+  			</li>
+  		</ul>
+  		<button id="clear-completed">Clear completed</button>
+  	</footer>
+  </section>
+
+  <script src="vendor/jquery-3.1.1.min.js"></script>
+  <script type="text/javascript">
+    class Store {
+      constructor(reducer){
+        this.reducer = reducer;
+        this.listeners = [];
+        this.state = reducer();
+      }
+
+      dispatch(action){
+        this.state = this.reducer(this.state, action);
+        this.listeners.forEach(listener => listener());
+      }
+
+      getState(){
+        return this.state;
+      }
+
+      subscribe(listener){
+        this.listeners.push(listener);
+        // unsubscribe
+        return () => this.listeners.filter((l) => l != listener);
+      }
+    }
+
+    const LOAD_TODO = 'LOAD_TODO';
+    const TOGGLE_TODO = 'TOGGLE_TODO';
+    const DELETE_TODO = 'DELETE_TODO';
+    const ADD_TODO = 'ADD_TODO';
+    const ClEAR_COMPLETED = 'ClEAR_COMPLETED';
+    const TOGGLE_ALL = 'TOGGLE_ALL';
+
+    const todo = (state, action) => {
+      if(!action){
+        return state;
+      }
+
+      switch(action.type){
+        case ADD_TODO:
+          return {
+            title: action.title,
+            completed: false
+          };
+        case TOGGLE_TODO:
+          // return new object
+          return Object.assign({}, state, {
+            completed: !state.completed
+          });
+        default:
+          return state;
+      }
+    };
+
+    const todos = (state = [], action) => {
+      if(!action){
+        return state;
+      }
+
+      console.log(action.type);
+
+      switch (action.type) {
+        case LOAD_TODO:
+          return action.todos;
+        case TOGGLE_TODO:
+          // return concat array
+          return [
+            ...state.slice(0, action.index),
+            todo(state[action.index], action),
+            ...state.slice(action.index + 1)
+          ];
+        case DELETE_TODO:
+          // return concat array
+          return [
+            ...state.slice(0, action.index),
+            ...state.slice(action.index + 1)
+          ];
+        case ADD_TODO:
+          // return concat array
+          return [
+            ...state,
+            todo(undefined, action)
+          ];
+        case ClEAR_COMPLETED:
+          // return new array
+          return state.filter(todo => !todo.completed);
+        case TOGGLE_ALL:
+          var allComplete = state.every(todo => todo.completed);
+          if(allComplete){
+            return state.map(todo => {
+              return Object.assign({}, todo, {
+                completed: false
+              });
+            });
+          } else {
+            return state.map(todo => {
+              return Object.assign({}, todo, {
+                completed: true
+              });
+            });
+          }
+        default:
+          return state;
+      }
+    };
+
+    const SET_VISIBILITY_FILTER = 'SET_VISIBILITY_FILTER';
+
+    const visibilityFilter = (state = 'SHOW_ALL', action) => {
+      if(!action){
+        return state;
+      }
+
+      switch(action.type){
+        case SET_VISIBILITY_FILTER:
+          return action.filter;
+        default:
+          return state;
+      }
+    };
+
+    const todoApp = (state = {}, action) => {
+      return {
+        todos:
+          todos(state.todos, action),
+        visibilityFilter:
+          visibilityFilter(state.visibilityFilter, action)
+      };
+    }
+
+    /* =============================
+     *      computed app state
+     * =============================*/
+    function getFilteredTodoList(){
+      let {todos} = store.getState();
+      let {visibilityFilter} = store.getState();
+      return todos.filter(function(todo){
+        switch(visibilityFilter){
+          case 'SHOW_ALL':
+            return true;
+          case 'SHOW_ACTIVE':
+            return !todo.completed;
+          case 'SHOW_COMPLETED':
+            return todo.completed;
+        }
+      });
+    }
+
+    /* =============================
+     *      app functionality
+     * =============================*/
+    function toggleTodo(index){
+      store.dispatch({
+        type: TOGGLE_TODO,
+        index
+      });
+    }
+
+    function deleteTodo(index){
+      store.dispatch({
+        type: DELETE_TODO,
+        index
+      });
+    }
+
+    function addTodo(title){
+      store.dispatch({
+        type: ADD_TODO,
+        title
+      });
+    }
+
+    function filterTodo(filter){
+      store.dispatch({
+        type: SET_VISIBILITY_FILTER,
+        filter
+      });
+    }
+
+    function clearCompleted(){
+      store.dispatch({
+        type: ClEAR_COMPLETED
+      });
+    }
+
+    function toggleAll(){
+      store.dispatch({
+        type: TOGGLE_ALL
+      });
+    }
+
+    /* =============================
+     *      UI Renderer
+     * =============================*/
+    function Todo({index, todo, onToggleTodo, onDeleteTodo}) {
+      let checked = todo.completed? 'checked="checked"' : '';
+
+      return `
+        <div class="view">
+          <input class="toggle" type="checkbox" ${checked}
+            onclick="${onToggleTodo}(${index})">
+          <label>${todo.title}</label>
+          <button class="destroy" onclick="${onDeleteTodo}(${index})">
+          </button>
+        </div>
+      `;
+    }
+
+    function renderTodoList(){
+      var $todoList = $('#todo-list');
+      var filteredTodoList = getFilteredTodoList();
+
+      var html = filteredTodoList.map(function(todo, index){
+        var completed = todo.completed? 'completed' : '';
+        return `
+          <li data-id="${index}" class="${completed}">
+            ${Todo({
+              index: index,
+              todo: todo,
+              onToggleTodo: 'toggleTodo',
+              onDeleteTodo: 'deleteTodo'
+            })}
+          </li>
+        `;
+      });
+
+      $todoList.html(html);
+    }
+
+    function renderTodoCount(){
+      var $todoCount = $('#todo-count');
+      var totalTodo = getFilteredTodoList().length;
+
+      var html = `${totalTodo} item${totalTodo >1? 's' : ''} left`;
+
+      $todoCount.html(html);
+    }
+
+    function renderFilters(){
+      var $filters = $('#filters');
+      var filterOptions = [
+        {
+          label: 'All',
+          value: 'SHOW_ALL'
+        },
+        {
+          label: 'Active',
+          value: 'SHOW_ACTIVE'
+        },
+        {
+          label: 'Completed',
+          value: 'SHOW_COMPLETED'
+        }
+      ];
+
+      let {visibilityFilter} = store.getState();
+      var html = filterOptions.map(function(filter){
+        if(visibilityFilter === filter.value){
+          return `
+            <li>
+              <a href="javascript:;" style="cursor: default;" class="selected">
+                ${filter.label}
+              </a>
+            </li>
+          `;
+        } else {
+          return `
+            <li>
+              <a href="javascript:filterTodo('${filter.value}')">
+                ${filter.label}
+              </a>
+            </li>
+          `;
+        }
+      });
+
+      $filters.html(html);
+    }
+
+    function renderClearCompleted(){
+      var $clearCompleted = $('#clear-completed');
+
+      let {todos} = store.getState();
+      var totalCompleted = todos.filter(t => t.completed).length;
+      console.log(totalCompleted);
+      if(totalCompleted > 0){
+        $clearCompleted
+          .css('display', 'block')
+          .attr('onclick', 'clearCompleted()');
+      } else {
+        $clearCompleted
+          .css('display', 'none');
+      }
+    }
+
+    function renderToggleAll(){
+      var $toggleAll = $('#toggle-all');
+
+      let {todos} = store.getState();
+      var allComplete = todos.every(todo => todo.completed);
+      console.log(allComplete);
+
+      if(allComplete) {
+        $toggleAll.attr('checked', 'checked');
+      } else {
+        $toggleAll.attr('checked', false);
+      }
+      $toggleAll.attr('onclick', 'toggleAll()');
+    }
+
+    /* =============================
+     *      app first load
+     * =============================*/
+    let store = new Store(todoApp);
+    // attach Render Component to State Change Event
+    store.subscribe(() => {
+      console.log(store.getState())
+
+      renderTodoList();
+      renderTodoCount();
+      renderFilters();
+      renderClearCompleted();
+      renderToggleAll();
+    });
+
+    // store.dispatch();
+
+    store.dispatch({
+      type: LOAD_TODO,
+      todos: [
+        {
+          title: 'belajar HTML5',
+          completed: true
+        },
+        {
+          title: 'belajar jQuery',
+          completed: false
+        },
+        {
+          title: 'belajar Chartist',
+          completed: false
+        }
+      ]
+    });
+
+  </script>
+</body>
+</html>
